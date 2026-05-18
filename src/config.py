@@ -1,9 +1,29 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 import yaml
+
+_ENV_RE = re.compile(r"\$\{([^}]+)\}")
+
+
+def _resolve(value: Any) -> Any:
+    """Expand ${ENV_VAR} references in string config values."""
+    if not isinstance(value, str):
+        return value
+    def _sub(m: re.Match) -> str:
+        var = m.group(1)
+        result = os.environ.get(var)
+        if result is None:
+            raise ValueError(f"Config references undefined environment variable: ${{{var}}}")
+        return result
+    return _ENV_RE.sub(_sub, value)
+
+
+def _resolve_dict(d: dict) -> dict:
+    return {k: _resolve(v) for k, v in d.items()}
 
 
 @dataclass
@@ -62,9 +82,9 @@ class Config:
         with open(config_path) as f:
             data = yaml.safe_load(f) or {}
 
-        fgts = [FortiGateConfig(**d) for d in data.get("fortigates", [])]
-        fmgs = [FortiManagerConfig(**d) for d in data.get("fortimanagers", [])]
-        fazs = [FortiAnalyzerConfig(**d) for d in data.get("fortianalyzers", [])]
+        fgts = [FortiGateConfig(**_resolve_dict(d)) for d in data.get("fortigates", [])]
+        fmgs = [FortiManagerConfig(**_resolve_dict(d)) for d in data.get("fortimanagers", [])]
+        fazs = [FortiAnalyzerConfig(**_resolve_dict(d)) for d in data.get("fortianalyzers", [])]
 
         return cls(fortigates=fgts, fortimanagers=fmgs, fortianalyzers=fazs)
 

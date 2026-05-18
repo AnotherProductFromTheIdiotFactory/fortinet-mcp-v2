@@ -8,9 +8,10 @@ fortigates:
     name: "HQ FortiGate"
     host: "192.168.1.1"
     port: 443
-    api_key: "your-api-key-here"       # preferred: REST API key
+    api_key: "${FGT_HQ_API_KEY}"       # preferred: REST API key via env var
+    # api_key: "your-api-key-here"     # or hardcode (not recommended for shared configs)
     # username: "admin"                # alternative: username/password
-    # password: "password"
+    # password: "${FGT_HQ_PASSWORD}"
     verify_ssl: false
     vdom: "root"                       # default VDOM
 
@@ -19,7 +20,7 @@ fortigates:
     host: "10.0.1.1"
     port: 443
     username: "admin"
-    password: "password"
+    password: "${FGT_BRANCH_PASSWORD}"
     verify_ssl: false
     vdom: "root"
 
@@ -29,7 +30,7 @@ fortimanagers:
     host: "192.168.1.10"
     port: 443
     username: "admin"
-    password: "password"
+    password: "${FMG_PRIMARY_PASSWORD}"
     verify_ssl: false
     adom: "root"                       # default ADOM
 
@@ -39,6 +40,6 @@ fortianalyzers:
     host: "192.168.1.20"
     port: 443
     username: "admin"
-    password: "password"
+    password: "${FAZ_PRIMARY_PASSWORD}"
     verify_ssl: false
     adom: "root"                       # default ADOM

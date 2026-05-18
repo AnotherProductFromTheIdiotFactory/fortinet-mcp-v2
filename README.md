@@ -29,7 +29,7 @@ fortigates:
   - id: fgt-hq
     name: "HQ FortiGate"
     host: "192.168.1.1"
-    api_key: "your-api-key"
+    api_key: "${FGT_HQ_API_KEY}"   # resolved from environment at startup
     verify_ssl: false
     vdom: "root"
 
@@ -37,15 +37,29 @@ fortimanagers:
   - id: fmg-01
     host: "192.168.1.10"
     username: "admin"
-    password: "password"
+    password: "${FMG_01_PASSWORD}"
     verify_ssl: false
 
 fortianalyzers:
   - id: faz-01
     host: "192.168.1.20"
     username: "admin"
-    password: "password"
+    password: "${FAZ_01_PASSWORD}"
     verify_ssl: false
+```
+
+Any string value in the config supports `${ENV_VAR}` substitution. The server resolves these at startup — the actual secrets never need to be written to disk.
+
+Pass them to Docker via an env file:
+```bash
+# .env  (add to .gitignore)
+FGT_HQ_API_KEY=xxxxxxxxxxxx
+FMG_01_PASSWORD=s3cr3t
+FAZ_01_PASSWORD=s3cr3t
+```
+```yaml
+# docker-compose.yml
+env_file: .env
 ```
 
 ## Claude Desktop integration
