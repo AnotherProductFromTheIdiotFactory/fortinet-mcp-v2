@@ -1,0 +1,22 @@
+services:
+  fortinet-mcp:
+    build: .
+    container_name: fortinet-mcp
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+    environment:
+      - MCP_TRANSPORT=streamable-http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      - CONFIG_PATH=/config/config.yaml
+      # Optional: override log level
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    networks:
+      - fortinet-mcp-net
+
+networks:
+  fortinet-mcp-net:
+    driver: bridge

@@ -1,0 +1,44 @@
+
+# Fortinet MCP Server Configuration
+# Copy to config.yaml and fill in your device details.
+# Supports multiple instances of each product type.
+
+fortigates:
+  - id: fgt-hq
+    name: "HQ FortiGate"
+    host: "192.168.1.1"
+    port: 443
+    api_key: "your-api-key-here"       # preferred: REST API key
+    # username: "admin"                # alternative: username/password
+    # password: "password"
+    verify_ssl: false
+    vdom: "root"                       # default VDOM
+
+  - id: fgt-branch
+    name: "Branch FortiGate"
+    host: "10.0.1.1"
+    port: 443
+    username: "admin"
+    password: "password"
+    verify_ssl: false
+    vdom: "root"
+
+fortimanagers:
+  - id: fmg-primary
+    name: "Primary FortiManager"
+    host: "192.168.1.10"
+    port: 443
+    username: "admin"
+    password: "password"
+    verify_ssl: false
+    adom: "root"                       # default ADOM
+
+fortianalyzers:
+  - id: faz-primary
+    name: "Primary FortiAnalyzer"
+    host: "192.168.1.20"
+    port: 443
+    username: "admin"
+    password: "password"
+    verify_ssl: false
+    adom: "root"                       # default ADOM
