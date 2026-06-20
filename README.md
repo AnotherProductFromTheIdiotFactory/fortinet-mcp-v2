@@ -117,6 +117,7 @@ guidance, certificates, and multi-appliance examples.
 - [Installation and deployment](docs/INSTALLATION.md)
 - [Configuration reference](docs/CONFIGURATION.md)
 - [Operations guide](docs/OPERATIONS.md)
+- [FortiGate operational runbook](docs/FORTIGATE_RUNBOOK.md)
 - [FortiAnalyzer operational runbook](docs/FORTIANALYZER_RUNBOOK.md)
 - [FortiOS 8 API contract](docs/FORTIOS_8_API.md)
 - [Complete tool reference](docs/TOOL_REFERENCE.md)

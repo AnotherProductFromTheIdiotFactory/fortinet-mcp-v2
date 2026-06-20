@@ -73,6 +73,9 @@ FortiGate configuration can be retrieved with `fgt_backup_config`. FortiManager
 and FortiAnalyzer should also be backed up using their supported appliance
 procedures; the MCP server is not a substitute for platform backups.
 
+For FortiGate workflow examples and the domain-scoped request tools, see
+`docs/FORTIGATE_RUNBOOK.md`.
+
 ## Upgrade
 
 ```bash

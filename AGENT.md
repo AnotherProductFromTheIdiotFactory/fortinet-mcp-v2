@@ -56,6 +56,26 @@ The official FortiAnalyzer 8.0.0 OpenAPI export is the contract.
 See `docs/FORTIANALYZER_8_API.md` and
 `docs/FORTIANALYZER_RUNBOOK.md` before changing FortiAnalyzer behavior.
 
+## FortiGate Rules
+
+The FortiGate contract is split across FortiOS REST domains.
+
+- The generic REST entry point is `/api/v2/...`.
+- Configuration APIs live under `/api/v2/cmdb/...`.
+- Monitoring APIs live under `/api/v2/monitor/...`.
+- Log APIs live under `/api/v2/log/...`.
+- Service APIs live under `/api/v2/service/...`.
+- New domain-specific behavior should prefer `fgt_cmdb_request`,
+  `fgt_monitor_request`, `fgt_log_request`, or `fgt_service_request` over
+  adding thin one-off wrappers.
+- New typed FortiGate tools should be reserved for common operational
+  workflows that are safer or easier than raw domain requests.
+- Preserve the client's default `vdom` injection behavior unless the request
+  explicitly overrides it.
+- Session endpoints such as `/logincheck` and `/logout` remain client-managed.
+
+See `docs/FORTIOS_8_API.md` before changing FortiGate behavior.
+
 ## Change Workflow
 
 1. Read the client, tool registration, tests, and relevant documentation.

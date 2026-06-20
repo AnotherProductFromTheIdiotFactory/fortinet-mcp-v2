@@ -9,6 +9,8 @@
 ## Operate
 
 - [Operations](OPERATIONS.md): lifecycle, monitoring, upgrades, backup, and recovery.
+- [FortiGate runbook](FORTIGATE_RUNBOOK.md): configuration, monitor, log,
+  service, and typed FortiGate workflows.
 - [FortiAnalyzer runbook](FORTIANALYZER_RUNBOOK.md): logs, reports, incidents,
   alerts, FortiView, and generic v8 API calls.
 - [Tool reference](TOOL_REFERENCE.md): all 116 registered tools.
@@ -30,6 +32,6 @@
 |---|---|
 | MCP user | README, Tool reference, product runbook |
 | Platform operator | Installation, Configuration, Operations, Security |
-| Network operator | Tool reference, FortiAnalyzer runbook, Security |
+| Network operator | Tool reference, FortiGate runbook, FortiAnalyzer runbook, Security |
 | Developer | AGENT.md, Development, API contract |
 | Incident responder | Troubleshooting, Operations, Security |

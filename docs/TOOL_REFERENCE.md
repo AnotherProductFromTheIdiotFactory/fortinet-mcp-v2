@@ -91,6 +91,9 @@ Write-capable tools include CLI execution, all create/update/delete/reorder
 operations, and generic API calls using `post`, `put`, or `delete`. Read
 current state and prepare rollback data first.
 
+See the [FortiGate runbook](FORTIGATE_RUNBOOK.md) for request examples and
+domain-specific usage guidance.
+
 ## FortiManager (31)
 
 | Tool | Purpose |
