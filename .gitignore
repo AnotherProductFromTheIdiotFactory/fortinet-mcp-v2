@@ -1,11 +1,8 @@
-config.yaml
 .env
-*.env
-*.pyc
-__pycache__/
+config.yaml
 .venv/
-venv/
-*.egg-info/
-dist/
-build/
+__pycache__/
+*.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/

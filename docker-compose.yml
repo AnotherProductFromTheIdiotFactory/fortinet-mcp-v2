@@ -6,6 +6,8 @@ services:
       - "8000:8000"
     volumes:
       - ./config.yaml:/config/config.yaml:ro
+    env_file:
+      - .env
     environment:
       - MCP_TRANSPORT=streamable-http
       - MCP_HOST=0.0.0.0
