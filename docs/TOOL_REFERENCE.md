@@ -4,45 +4,84 @@ Tools are registered only when the corresponding product has at least one
 entry in `config.yaml`. Every operational tool uses a configured `device_id`.
 Run the product's list tool first.
 
-## FortiGate (31)
+## FortiGate (48)
+
+### Discovery and Complete API
 
 | Tool | Purpose |
 |---|---|
 | `fgt_list_devices` | List configured FortiGate devices |
+| `fgt_api_request` | Call any documented FortiGate REST v2 endpoint |
+| `fgt_api_batch` | Execute up to 50 ordered REST operations |
 | `fgt_get_system_status` | Firmware, serial number, and uptime |
 | `fgt_get_system_resources` | CPU and memory usage |
 | `fgt_get_interfaces` | Network interfaces |
 | `fgt_backup_config` | Retrieve a full configuration backup |
 | `fgt_execute_cli` | Execute CLI commands |
 | `fgt_get_ha_status` | HA cluster status |
+
+### Firewall Policy and Objects
+
+| Tool | Purpose |
+|---|---|
 | `fgt_get_firewall_policies` | List or retrieve firewall policies |
 | `fgt_create_firewall_policy` | Create a firewall policy |
 | `fgt_update_firewall_policy` | Update a firewall policy |
 | `fgt_delete_firewall_policy` | Delete a firewall policy |
+| `fgt_move_firewall_policy` | Reorder a firewall policy |
 | `fgt_get_address_objects` | List address objects |
 | `fgt_create_address_object` | Create an address object |
 | `fgt_update_address_object` | Update an address object |
 | `fgt_delete_address_object` | Delete an address object |
 | `fgt_get_address_groups` | List address groups |
 | `fgt_create_address_group` | Create an address group |
+| `fgt_update_address_group` | Update an address group |
+| `fgt_delete_address_group` | Delete an address group |
 | `fgt_get_service_objects` | List service objects |
 | `fgt_create_service_object` | Create a service object |
+| `fgt_update_service_object` | Update a service object |
+| `fgt_delete_service_object` | Delete a service object |
+| `fgt_get_service_groups` | List service groups |
+| `fgt_create_service_group` | Create a service group |
+| `fgt_update_service_group` | Update a service group |
+| `fgt_delete_service_group` | Delete a service group |
+
+### Routing and VPN
+
+| Tool | Purpose |
+|---|---|
 | `fgt_get_static_routes` | List configured static routes |
 | `fgt_create_static_route` | Create a static route |
+| `fgt_update_static_route` | Update a static route |
 | `fgt_delete_static_route` | Delete a static route |
 | `fgt_get_routing_table` | Active routing table |
 | `fgt_get_bgp_neighbors` | BGP neighbor state |
 | `fgt_get_ipsec_tunnels` | Active IPsec tunnel state |
 | `fgt_get_ipsec_phase1_config` | IPsec phase 1 configuration |
 | `fgt_create_ipsec_phase1` | Create an IPsec phase 1 interface |
+| `fgt_update_ipsec_phase1` | Update an IPsec phase 1 interface |
+| `fgt_delete_ipsec_phase1` | Delete an IPsec phase 1 interface |
+| `fgt_get_ssl_vpn_settings` | SSL-VPN settings |
 | `fgt_get_ssl_vpn_sessions` | Active SSL-VPN sessions |
+
+### Monitoring and Logs
+
+| Tool | Purpose |
+|---|---|
 | `fgt_get_active_sessions` | Active firewall sessions |
 | `fgt_get_session_stats` | Session table statistics |
+| `fgt_get_fortiview_top_sources` | Top FortiView source statistics |
+| `fgt_get_threat_feeds` | Configured threat feeds |
 | `fgt_get_logs` | Retrieve FortiGate disk logs |
 
-Write-capable tools include CLI execution, all create/update/delete operations,
-and configuration restore effects initiated outside this server. Read current
-state and prepare rollback data first.
+Use a typed tool when one matches the workflow. Use `fgt_api_request` for an
+official REST endpoint that does not have a dedicated convenience tool.
+`fgt_api_batch` executes related operations in order and stops on the first
+failure.
+
+Write-capable tools include CLI execution, all create/update/delete/reorder
+operations, and generic API calls using `post`, `put`, or `delete`. Read
+current state and prepare rollback data first.
 
 ## FortiManager (31)
 

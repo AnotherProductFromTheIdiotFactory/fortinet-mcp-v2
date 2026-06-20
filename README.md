@@ -10,9 +10,14 @@ tools only for product types present in `config.yaml`.
 
 | Product | Tools | API style | Primary capabilities |
 |---|---:|---|---|
-| FortiGate | 31 | REST API | Status, policy, objects, routes, VPN, sessions, logs |
+| FortiGate | 48 | REST API | Status, policy, objects, routes, VPN, sessions, logs, complete v8 REST access |
 | FortiManager | 31 | JSON-RPC | Devices, policy packages, objects, scripts, installs, tasks |
 | FortiAnalyzer | 29 | JSON-RPC | Logs, reports, incidents, alerts, FortiView, complete v8 access |
+
+FortiGate 8 coverage includes typed operational tools and generic
+`fgt_api_request` / `fgt_api_batch` tools for the documented FortiOS REST API
+surface, including the official FortiOS 8 CMDB Swagger export attached for
+this branch.
 
 FortiAnalyzer 8 coverage includes typed operational tools and generic
 `faz_api_request` / `faz_api_batch` tools for every operation described by the
@@ -113,6 +118,7 @@ guidance, certificates, and multi-appliance examples.
 - [Configuration reference](docs/CONFIGURATION.md)
 - [Operations guide](docs/OPERATIONS.md)
 - [FortiAnalyzer operational runbook](docs/FORTIANALYZER_RUNBOOK.md)
+- [FortiOS 8 API contract](docs/FORTIOS_8_API.md)
 - [Complete tool reference](docs/TOOL_REFERENCE.md)
 - [Security guide](docs/SECURITY.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)

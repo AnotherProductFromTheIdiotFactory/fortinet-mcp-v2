@@ -22,6 +22,11 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
             clients[device_id] = FortiGateClient(config.get_fgt(device_id))
         return clients[device_id]
 
+    def dump(result: Any) -> str:
+        if isinstance(result, str):
+            return result
+        return json.dumps(result, indent=2)
+
     # ── Discovery ───────────────────────────────────────────────────────────
 
     @mcp.tool()
@@ -32,6 +37,71 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
             for d in config.fortigates
         ]
         return json.dumps(devices, indent=2)
+
+    @mcp.tool()
+    async def fgt_api_request(
+        device_id: str,
+        method: str,
+        path: str,
+        data: Optional[Any] = None,
+        params: Optional[dict] = None,
+    ) -> str:
+        """Call any FortiGate REST API v2 endpoint.
+
+        This is the complete-coverage tool for documented FortiOS 8 REST
+        endpoints that do not have a dedicated ``fgt_`` convenience tool.
+        Authentication and one retry for an expired session are handled
+        automatically. Paths must begin with ``/api/v2/``.
+
+        Args:
+            device_id: ID of the FortiGate device from config.
+            method: HTTP method: get, post, put, or delete.
+            path: Documented FortiGate REST path beginning with '/api/v2/'.
+            data: Optional JSON request body for post and put requests.
+            params: Optional query parameters such as vdom, filter, start, count,
+                    action, or scope.
+        """
+        c = get_client(device_id)
+        result = await c.request(method, path, data=data, params=params)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_api_batch(device_id: str, requests: list[dict]) -> str:
+        """Run a sequence of FortiGate REST API operations.
+
+        Requests execute in order and stop on the first API error. Each item
+        accepts ``method``, ``path``, and optional ``data`` and ``params`` keys.
+        Use this for related reads or carefully ordered configuration changes.
+
+        Args:
+            device_id: ID of the FortiGate device from config.
+            requests: REST operation objects, limited to 50 per call.
+        """
+        if not requests:
+            raise ValueError("requests must contain at least one operation")
+        if len(requests) > 50:
+            raise ValueError("fgt_api_batch accepts at most 50 operations")
+
+        c = get_client(device_id)
+        results = []
+        for index, request in enumerate(requests):
+            if not isinstance(request, dict):
+                raise ValueError(f"requests[{index}] must be an object")
+            unknown = set(request) - {"method", "path", "data", "params"}
+            if unknown:
+                names = ", ".join(sorted(unknown))
+                raise ValueError(f"requests[{index}] has unsupported key(s): {names}")
+            if "method" not in request or "path" not in request:
+                raise ValueError(f"requests[{index}] requires method and path")
+            results.append(
+                await c.request(
+                    request["method"],
+                    request["path"],
+                    data=request.get("data"),
+                    params=request.get("params"),
+                )
+            )
+        return dump(results)
 
     # ── System ──────────────────────────────────────────────────────────────
 
@@ -45,7 +115,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_system_status()
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_get_system_resources(device_id: str) -> str:
@@ -57,7 +127,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_system_resources()
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_get_interfaces(device_id: str) -> str:
@@ -69,7 +139,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_interfaces()
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_backup_config(device_id: str) -> str:
@@ -93,7 +163,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.execute_cli(commands)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_get_ha_status(device_id: str) -> str:
@@ -105,7 +175,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_ha_status()
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     # ── Firewall Policies ───────────────────────────────────────────────────
 
@@ -120,7 +190,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_firewall_policies(policy_id)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_create_firewall_policy(device_id: str, policy: dict) -> str:
@@ -146,7 +216,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.create_firewall_policy(policy)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_update_firewall_policy(device_id: str, policy_id: int, policy: dict) -> str:
@@ -160,7 +230,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.update_firewall_policy(policy_id, policy)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_delete_firewall_policy(device_id: str, policy_id: int) -> str:
@@ -173,7 +243,24 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.delete_firewall_policy(policy_id)
-        return json.dumps(result, indent=2)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_move_firewall_policy(
+        device_id: str, policy_id: int, action: str, neighbor: int
+    ) -> str:
+        """Move a firewall policy relative to another policy.
+
+        Args:
+            device_id: ID of the FortiGate device from config.
+            policy_id: Policy ID to move.
+            action: Reorder action such as before or after.
+            neighbor: Neighbor policy ID used by the action.
+        """
+        c = get_client(device_id)
+        await c.login()
+        result = await c.move_firewall_policy(policy_id, action, neighbor)
+        return dump(result)
 
     # ── Address Objects ─────────────────────────────────────────────────────
 
@@ -188,7 +275,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_address_objects(name)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_create_address_object(device_id: str, obj: dict) -> str:
@@ -204,7 +291,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.create_address_object(obj)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_update_address_object(device_id: str, name: str, obj: dict) -> str:
@@ -218,7 +305,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.update_address_object(name, obj)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_delete_address_object(device_id: str, name: str) -> str:
@@ -231,7 +318,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.delete_address_object(name)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_get_address_groups(device_id: str, name: Optional[str] = None) -> str:
@@ -244,7 +331,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_address_groups(name)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_create_address_group(device_id: str, obj: dict) -> str:
@@ -258,7 +345,23 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.create_address_group(obj)
-        return json.dumps(result, indent=2)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_update_address_group(device_id: str, name: str, obj: dict) -> str:
+        """Update an address group on a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.update_address_group(name, obj)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_delete_address_group(device_id: str, name: str) -> str:
+        """Delete an address group from a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.delete_address_group(name)
+        return dump(result)
 
     # ── Services ────────────────────────────────────────────────────────────
 
@@ -273,7 +376,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_service_objects(name)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_create_service_object(device_id: str, obj: dict) -> str:
@@ -287,7 +390,55 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.create_service_object(obj)
-        return json.dumps(result, indent=2)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_update_service_object(device_id: str, name: str, obj: dict) -> str:
+        """Update a service object on a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.update_service_object(name, obj)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_delete_service_object(device_id: str, name: str) -> str:
+        """Delete a service object from a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.delete_service_object(name)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_get_service_groups(device_id: str, name: Optional[str] = None) -> str:
+        """List service groups on a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.get_service_groups(name)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_create_service_group(device_id: str, obj: dict) -> str:
+        """Create a service group on a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.create_service_group(obj)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_update_service_group(device_id: str, name: str, obj: dict) -> str:
+        """Update a service group on a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.update_service_group(name, obj)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_delete_service_group(device_id: str, name: str) -> str:
+        """Delete a service group from a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.delete_service_group(name)
+        return dump(result)
 
     # ── Routing ─────────────────────────────────────────────────────────────
 
@@ -301,7 +452,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_static_routes()
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_create_static_route(device_id: str, route: dict) -> str:
@@ -316,7 +467,15 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.create_static_route(route)
-        return json.dumps(result, indent=2)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_update_static_route(device_id: str, seq_num: int, route: dict) -> str:
+        """Update a static route on a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.update_static_route(seq_num, route)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_delete_static_route(device_id: str, seq_num: int) -> str:
@@ -329,7 +488,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.delete_static_route(seq_num)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_get_routing_table(device_id: str) -> str:
@@ -341,7 +500,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_routing_table()
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_get_bgp_neighbors(device_id: str) -> str:
@@ -353,7 +512,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_bgp_neighbors()
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     # ── VPN ─────────────────────────────────────────────────────────────────
 
@@ -367,7 +526,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_ipsec_tunnels()
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_get_ipsec_phase1_config(device_id: str, name: Optional[str] = None) -> str:
@@ -380,7 +539,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_ipsec_phase1(name)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_create_ipsec_phase1(device_id: str, config: dict) -> str:
@@ -393,7 +552,31 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.create_ipsec_phase1(config)
-        return json.dumps(result, indent=2)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_update_ipsec_phase1(device_id: str, name: str, config: dict) -> str:
+        """Update an IPsec Phase1 tunnel interface on a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.update_ipsec_phase1(name, config)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_delete_ipsec_phase1(device_id: str, name: str) -> str:
+        """Delete an IPsec Phase1 tunnel interface from a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.delete_ipsec_phase1(name)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_get_ssl_vpn_settings(device_id: str) -> str:
+        """Get SSL-VPN settings from a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.get_ssl_vpn_settings()
+        return dump(result)
 
     @mcp.tool()
     async def fgt_get_ssl_vpn_sessions(device_id: str) -> str:
@@ -405,7 +588,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_ssl_vpn_sessions()
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     # ── Sessions & Monitoring ───────────────────────────────────────────────
 
@@ -420,7 +603,7 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_active_sessions(count)
-        return json.dumps(result, indent=2)
+        return dump(result)
 
     @mcp.tool()
     async def fgt_get_session_stats(device_id: str) -> str:
@@ -432,7 +615,23 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_session_stats()
-        return json.dumps(result, indent=2)
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_get_fortiview_top_sources(device_id: str) -> str:
+        """Get top FortiView sources from a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.get_fortiview_top_sources()
+        return dump(result)
+
+    @mcp.tool()
+    async def fgt_get_threat_feeds(device_id: str) -> str:
+        """List configured threat feeds on a FortiGate."""
+        c = get_client(device_id)
+        await c.login()
+        result = await c.get_threat_feeds()
+        return dump(result)
 
     # ── Logs ────────────────────────────────────────────────────────────────
 
@@ -454,4 +653,4 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_logs(log_type, subtype, rows)
-        return json.dumps(result, indent=2)
+        return dump(result)

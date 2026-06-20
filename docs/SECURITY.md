@@ -25,8 +25,13 @@ Treat access to the MCP endpoint as privileged network-management access.
 ## Least Privilege
 
 Separate read-only and change-capable deployments when possible. A monitoring
-client does not need firewall-policy writes, script execution, installs, or
-generic FortiAnalyzer mutation access.
+client does not need firewall-policy writes, script execution, installs,
+generic FortiGate mutation access, or generic FortiAnalyzer mutation access.
+
+FortiGate `fgt_api_request` is intentionally broad. The server validates the
+HTTP method and path form, but authorization is enforced by the appliance. Use
+an API profile or administrator account limited to the required VDOMs and API
+areas.
 
 FortiAnalyzer `faz_api_request` is intentionally broad. The server validates the
 JSON-RPC method and URL form, but authorization is enforced by the appliance.
@@ -64,7 +69,7 @@ public CA. Ensure the configured `host` matches the certificate identity.
 
 High-risk categories include:
 
-- FortiGate CLI execution and all create/update/delete tools
+- FortiGate CLI execution, all create/update/delete tools, and generic API calls
 - FortiManager device deletion, scripts, installs, and policy changes
 - FortiAnalyzer generic API calls, batches, and any add/set/update/delete/exec/
   execute operation

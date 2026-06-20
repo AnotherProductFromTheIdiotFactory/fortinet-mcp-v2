@@ -40,8 +40,9 @@ Keep protocol handling in clients and MCP presentation in tools.
 6. Update `TOOL_REFERENCE.md` and the relevant runbook.
 7. Verify FastMCP schema registration.
 
-Avoid thin typed wrappers for obscure version-specific FortiAnalyzer endpoints;
-`faz_api_request` already provides complete official v8 coverage.
+Avoid thin typed wrappers for obscure version-specific FortiAnalyzer or
+FortiGate endpoints; `faz_api_request` and `fgt_api_request` already provide
+complete official API coverage for those products.
 
 ## Tests
 
@@ -65,10 +66,10 @@ The expected counts for this branch are:
 
 | Product | Tools |
 |---|---:|
-| FortiGate | 31 |
+| FortiGate | 48 |
 | FortiManager | 31 |
 | FortiAnalyzer | 29 |
-| Total | 91 |
+| Total | 108 |
 
 Update this table and `TOOL_REFERENCE.md` whenever tools are added or removed.
 
@@ -84,6 +85,16 @@ For a typed FortiAnalyzer change:
 
 Do not rely on FortiManager similarity; the products share JSON-RPC transport
 but not every URL or operational payload.
+
+## FortiOS Swagger Validation
+
+For a typed FortiGate change:
+
+1. Find the REST path in the official FortiOS Swagger export.
+2. Record the HTTP method and whether the endpoint is CMDB, monitor, or log.
+3. Confirm whether `vdom` belongs in the query string.
+4. Add a test that inspects the exact outgoing request path, query, and auth.
+5. Prefer `fgt_api_request` instead of adding a thin tool for one-off CMDB objects.
 
 ## Documentation Review
 

@@ -57,6 +57,7 @@ For any write operation:
 
 Do not place independent changes into `faz_api_batch` merely for convenience.
 The batch is ordered but not atomic and does not roll back earlier operations.
+The same warning applies to `fgt_api_batch` for FortiGate REST changes.
 
 ## Backup and Recovery
 

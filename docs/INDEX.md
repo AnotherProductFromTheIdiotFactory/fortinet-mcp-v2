@@ -11,13 +11,15 @@
 - [Operations](OPERATIONS.md): lifecycle, monitoring, upgrades, backup, and recovery.
 - [FortiAnalyzer runbook](FORTIANALYZER_RUNBOOK.md): logs, reports, incidents,
   alerts, FortiView, and generic v8 API calls.
-- [Tool reference](TOOL_REFERENCE.md): all 91 registered tools.
+- [Tool reference](TOOL_REFERENCE.md): all 108 registered tools.
 - [Troubleshooting](TROUBLESHOOTING.md): common failures and diagnostics.
 - [Security](SECURITY.md): permissions, secrets, TLS, network exposure, and audit.
 
 ## Develop
 
 - [Development](DEVELOPMENT.md): architecture, local setup, tests, and releases.
+- [FortiOS 8 API contract](FORTIOS_8_API.md): specification audit and
+  REST request semantics.
 - [FortiAnalyzer 8 API contract](FORTIANALYZER_8_API.md): specification audit and
   request semantics.
 - [Agent instructions](../AGENT.md): repository rules for coding agents.
