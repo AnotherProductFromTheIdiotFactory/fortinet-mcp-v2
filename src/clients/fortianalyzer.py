@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Optional
 import httpx
 
@@ -10,7 +11,9 @@ from config import FortiAnalyzerConfig
 class FortiAnalyzerClient:
     """FortiAnalyzer JSON-RPC API client."""
 
-    SUPPORTED_METHODS = frozenset({"get", "add", "set", "update", "delete", "exec"})
+    SUPPORTED_METHODS = frozenset(
+        {"get", "add", "set", "update", "delete", "exec", "execute"}
+    )
     SESSION_ERROR_CODES = frozenset({-11})
 
     def __init__(self, cfg: FortiAnalyzerConfig):
@@ -136,6 +139,19 @@ class FortiAnalyzerClient:
     async def exec(self, url: str, data: Optional[dict] = None) -> dict:
         return await self.request("exec", url, data=data)
 
+    @staticmethod
+    def _time_range(time_from: str | int, time_to: str | int) -> dict[str, str]:
+        def normalize(value: str | int) -> str:
+            if isinstance(value, int):
+                return datetime.fromtimestamp(value, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+            return value
+
+        return {"start": normalize(time_from), "end": normalize(time_to)}
+
+    @staticmethod
+    def _devices(device: str | list[dict]) -> list[dict]:
+        return [{"devid": device}] if isinstance(device, str) else device
+
     # ── System ─────────────────────────────────────────────────────────────
 
     async def get_system_status(self) -> dict:
@@ -154,199 +170,293 @@ class FortiAnalyzerClient:
         adom = adom or self._cfg.adom
         return await self.get(f"/dvmdb/adom/{adom}/group")
 
-    async def register_device(self, device_data: dict, adom: Optional[str] = None) -> dict:
-        adom = adom or self._cfg.adom
-        return await self.exec(
-            "/dvm/cmd/add/device",
-            {"adom": adom, "device": device_data},
-        )
-
     # ── Log Queries ──────────────────────────────────────────────────────────
 
     async def query_logs(
         self,
         adom: Optional[str] = None,
-        device: str = "All_FortiGate",
+        device: str | list[dict] = "All_FortiGate",
         log_type: str = "traffic",
-        filter: Optional[list] = None,
-        time_from: Optional[int] = None,
-        time_to: Optional[int] = None,
+        filter: Optional[str] = None,
+        time_from: str | int = 0,
+        time_to: str | int = 0,
         limit: int = 100,
         offset: int = 0,
-        fields: Optional[list[str]] = None,
+        timezone_name: Optional[str] = None,
+        case_sensitive: bool = False,
+        time_order: str = "desc",
     ) -> dict:
+        """Start a v8 log search and return its task ID."""
         adom = adom or self._cfg.adom
-        data: dict[str, Any] = {
-            "device": device,
+        params: dict[str, Any] = {
+            "apiver": 3,
+            "device": self._devices(device),
             "logtype": log_type,
+            "time-range": self._time_range(time_from, time_to),
             "limit": limit,
             "offset": offset,
+            "case-sensitive": case_sensitive,
+            "time-order": time_order,
         }
         if filter:
-            data["filter"] = filter
-        if time_from:
-            data["time-from"] = time_from
-        if time_to:
-            data["time-to"] = time_to
-        if fields:
-            data["fields"] = fields
-        return await self.exec(f"/logview/adom/{adom}/logsearch", data)
+            params["filter"] = filter
+        if timezone_name:
+            params["timezone"] = timezone_name
+        return await self.request("add", f"/logview/adom/{adom}/logsearch", params=params)
 
     async def get_log_fields(
-        self, log_type: str = "traffic", adom: Optional[str] = None
+        self,
+        log_type: str = "traffic",
+        adom: Optional[str] = None,
+        device_type: str = "FortiGate",
+        subtype: str = "",
     ) -> dict:
         adom = adom or self._cfg.adom
         return await self.get(
-            f"/logview/adom/{adom}/log/fields",
-            {"logtype": log_type},
+            f"/logview/adom/{adom}/logfields",
+            {"apiver": 3, "devtype": device_type, "logtype": log_type, "subtype": subtype},
         )
 
     async def start_log_search(
         self,
         adom: Optional[str] = None,
         log_type: str = "traffic",
-        filter: Optional[list] = None,
-        time_from: Optional[int] = None,
-        time_to: Optional[int] = None,
-        limit: int = 1000,
+        filter: Optional[str] = None,
+        time_from: str | int = 0,
+        time_to: str | int = 0,
+        limit: int = 100,
+        device: str | list[dict] = "All_FortiGate",
+    ) -> dict:
+        return await self.query_logs(
+            adom=adom,
+            device=device,
+            log_type=log_type,
+            filter=filter,
+            time_from=time_from,
+            time_to=time_to,
+            limit=limit,
+        )
+
+    async def get_log_search_results(
+        self, task_id: int, adom: Optional[str] = None, limit: int = 50, offset: int = 0
     ) -> dict:
         adom = adom or self._cfg.adom
-        data: dict[str, Any] = {"logtype": log_type, "limit": limit}
-        if filter:
-            data["filter"] = filter
-        if time_from:
-            data["time-from"] = time_from
-        if time_to:
-            data["time-to"] = time_to
-        return await self.exec(f"/logview/adom/{adom}/logsearch/start", data)
+        return await self.get(
+            f"/logview/adom/{adom}/logsearch/{task_id}",
+            {"apiver": 3, "limit": limit, "offset": offset},
+        )
+
+    async def get_log_search_count(self, task_id: int, adom: Optional[str] = None) -> dict:
+        adom = adom or self._cfg.adom
+        return await self.get(
+            f"/logview/adom/{adom}/logsearch/count/{task_id}", {"apiver": 3}
+        )
+
+    async def delete_log_search(self, task_id: int, adom: Optional[str] = None) -> dict:
+        adom = adom or self._cfg.adom
+        return await self.request(
+            "delete", f"/logview/adom/{adom}/logsearch/{task_id}", params={"apiver": 3}
+        )
 
     # ── Reports ──────────────────────────────────────────────────────────────
 
-    async def get_reports(self, adom: Optional[str] = None) -> dict:
+    async def get_reports(
+        self,
+        state: str,
+        adom: Optional[str] = None,
+        time_from: Optional[str | int] = None,
+        time_to: Optional[str | int] = None,
+        timezone_name: Optional[str] = None,
+        title: Optional[str] = None,
+    ) -> dict:
         adom = adom or self._cfg.adom
-        return await self.get(f"/report/adom/{adom}/reports/browse")
+        params: dict[str, Any] = {"apiver": 3, "state": state}
+        if time_from is not None and time_to is not None:
+            params["time-range"] = self._time_range(time_from, time_to)
+        if timezone_name:
+            params["timezone"] = timezone_name
+        if title:
+            params["title"] = title
+        return await self.get(f"/report/adom/{adom}/reports/state", params)
 
-    async def get_report_templates(self, adom: Optional[str] = None) -> dict:
+    async def get_report_templates(
+        self, adom: Optional[str] = None, device_type: str = "fgt", language: str = "en"
+    ) -> dict:
         adom = adom or self._cfg.adom
-        return await self.get(f"/report/adom/{adom}/template")
+        return await self.get(
+            f"/report/adom/{adom}/template/list",
+            {"apiver": 3, "dev-type": device_type, "language": language},
+        )
 
     async def run_report(
         self,
-        template_name: str,
-        time_from: int,
-        time_to: int,
-        device: str = "All_FortiGate",
+        schedule: Optional[str] = None,
+        schedule_params: Optional[dict] = None,
         adom: Optional[str] = None,
     ) -> dict:
         adom = adom or self._cfg.adom
-        return await self.exec(
+        if not schedule and not schedule_params:
+            raise ValueError("run_report requires schedule or schedule_params")
+        params: dict[str, Any] = {"apiver": 3}
+        if schedule:
+            params["schedule"] = schedule
+        if schedule_params:
+            params["schedule-param"] = schedule_params
+        return await self.request(
+            "add",
             f"/report/adom/{adom}/run",
-            {
-                "template": template_name,
-                "device": device,
-                "time-from": time_from,
-                "time-to": time_to,
-            },
+            params=params,
         )
 
     async def get_report_status(self, tid: int, adom: Optional[str] = None) -> dict:
         adom = adom or self._cfg.adom
-        return await self.get(f"/report/adom/{adom}/run/{tid}")
+        return await self.get(f"/report/adom/{adom}/run/{tid}", {"apiver": 3})
 
-    async def download_report(self, tid: int, adom: Optional[str] = None) -> dict:
+    async def download_report(
+        self,
+        tid: int,
+        adom: Optional[str] = None,
+        report_format: str = "PDF",
+        data_type: Optional[str] = None,
+    ) -> dict:
         adom = adom or self._cfg.adom
-        return await self.exec(f"/report/adom/{adom}/run/{tid}/download", {"format": "pdf"})
+        params: dict[str, Any] = {"apiver": 3, "format": report_format}
+        if data_type:
+            params["data-type"] = data_type
+        return await self.get(f"/report/adom/{adom}/reports/data/{tid}", params)
 
     # ── Incidents & Events ───────────────────────────────────────────────────
 
     async def get_incidents(
         self,
         adom: Optional[str] = None,
-        status: Optional[str] = None,
+        filter: Optional[str] = None,
         limit: int = 50,
+        offset: int = 0,
+        detail_level: Optional[str] = None,
     ) -> dict:
         adom = adom or self._cfg.adom
-        data: dict[str, Any] = {"limit": limit}
-        if status:
-            data["filter"] = [["status", "==", status]]
-        return await self.exec(f"/incidentmgmt/adom/{adom}/incidents/list", data)
+        params: dict[str, Any] = {"apiver": 3, "limit": limit, "offset": offset}
+        if filter:
+            params["filter"] = filter
+        if detail_level:
+            params["detail-level"] = detail_level
+        return await self.get(f"/incidentmgmt/adom/{adom}/incidents", params)
 
-    async def get_event_handlers(self, adom: Optional[str] = None) -> dict:
+    async def get_event_handlers(
+        self, alert_ids: list[str], adom: Optional[str] = None, rule_id: Optional[str] = None
+    ) -> dict:
         adom = adom or self._cfg.adom
-        return await self.get(f"/eventmgmt/adom/{adom}/alertfilter")
+        params: dict[str, Any] = {"apiver": 3, "alertid": alert_ids}
+        if rule_id:
+            params["ruleid"] = rule_id
+        return await self.get(f"/eventmgmt/adom/{adom}/alertfilter", params)
 
     async def get_events(
         self,
         adom: Optional[str] = None,
-        severity: Optional[str] = None,
-        limit: int = 100,
+        filter: Optional[str] = None,
+        limit: int = 1000,
+        offset: int = 0,
+        time_from: Optional[str | int] = None,
+        time_to: Optional[str | int] = None,
+        timezone_name: Optional[str] = None,
     ) -> dict:
         adom = adom or self._cfg.adom
-        data: dict[str, Any] = {"limit": limit}
-        if severity:
-            data["filter"] = [["severity", "==", severity]]
-        return await self.exec(f"/eventmgmt/adom/{adom}/events", data)
+        params: dict[str, Any] = {"apiver": 3, "limit": limit, "offset": offset}
+        if filter:
+            params["filter"] = filter
+        if time_from is not None and time_to is not None:
+            params["time-range"] = self._time_range(time_from, time_to)
+        if timezone_name:
+            params["timezone"] = timezone_name
+        return await self.get(f"/eventmgmt/adom/{adom}/alerts", params)
 
     # ── FortiView / Statistics ───────────────────────────────────────────────
 
     async def get_traffic_summary(
         self,
         adom: Optional[str] = None,
-        time_period: int = 86400,
-        device: str = "All_FortiGate",
+        device: str | list[dict] = "All_FortiGate",
     ) -> dict:
         adom = adom or self._cfg.adom
-        return await self.exec(
-            f"/logview/adom/{adom}/stats",
-            {"device": device, "period": time_period, "logtype": "traffic"},
+        return await self.get(
+            f"/logview/adom/{adom}/logstats",
+            {"apiver": 3, "device": self._devices(device)},
         )
 
-    async def get_threat_summary(
+    async def start_fortiview(
         self,
+        view_name: str,
+        time_from: str | int,
+        time_to: str | int,
         adom: Optional[str] = None,
-        time_period: int = 86400,
-        device: str = "All_FortiGate",
+        device: Optional[str | list[dict]] = None,
+        filter: Optional[str] = None,
+        limit: int = 1000,
+        offset: int = 0,
+        timezone_name: Optional[str] = None,
     ) -> dict:
         adom = adom or self._cfg.adom
-        return await self.exec(
-            f"/logview/adom/{adom}/stats",
-            {"device": device, "period": time_period, "logtype": "threat"},
+        params: dict[str, Any] = {
+            "apiver": 3,
+            "time-range": self._time_range(time_from, time_to),
+            "limit": limit,
+            "offset": offset,
+        }
+        if device:
+            params["device"] = self._devices(device)
+        if filter:
+            params["filter"] = filter
+        if timezone_name:
+            params["timezone"] = timezone_name
+        return await self.request(
+            "add", f"/fortiview/adom/{adom}/{view_name}/run", params=params
+        )
+
+    async def get_fortiview_results(
+        self, view_name: str, task_id: int, adom: Optional[str] = None
+    ) -> dict:
+        adom = adom or self._cfg.adom
+        return await self.get(
+            f"/fortiview/adom/{adom}/{view_name}/run/{task_id}", {"apiver": 3}
+        )
+
+    async def delete_fortiview(self, view_name: str, task_id: int, adom: Optional[str] = None) -> dict:
+        adom = adom or self._cfg.adom
+        return await self.request(
+            "delete",
+            f"/fortiview/adom/{adom}/{view_name}/run/{task_id}",
+            params={"apiver": 3},
         )
 
     async def get_top_sources(
         self,
+        time_from: str | int,
+        time_to: str | int,
         adom: Optional[str] = None,
-        time_period: int = 3600,
         limit: int = 20,
     ) -> dict:
-        adom = adom or self._cfg.adom
-        return await self.exec(
-            f"/fortiview/adom/{adom}/browse",
-            {"view": "top-source-ip", "period": time_period, "limit": limit},
-        )
+        return await self.start_fortiview("top-sources", time_from, time_to, adom, limit=limit)
 
     async def get_top_threats(
         self,
+        time_from: str | int,
+        time_to: str | int,
         adom: Optional[str] = None,
-        time_period: int = 3600,
         limit: int = 20,
     ) -> dict:
-        adom = adom or self._cfg.adom
-        return await self.exec(
-            f"/fortiview/adom/{adom}/browse",
-            {"view": "top-threat", "period": time_period, "limit": limit},
-        )
+        return await self.start_fortiview("top-threats", time_from, time_to, adom, limit=limit)
 
     async def get_top_applications(
         self,
+        time_from: str | int,
+        time_to: str | int,
         adom: Optional[str] = None,
-        time_period: int = 3600,
         limit: int = 20,
     ) -> dict:
-        adom = adom or self._cfg.adom
-        return await self.exec(
-            f"/fortiview/adom/{adom}/browse",
-            {"view": "top-application", "period": time_period, "limit": limit},
+        return await self.start_fortiview(
+            "top-applications", time_from, time_to, adom, limit=limit
         )
 
     async def close(self):

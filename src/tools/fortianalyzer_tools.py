@@ -75,7 +75,7 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            method: JSON-RPC method: get, add, set, update, delete, or exec.
+            method: JSON-RPC method: get, add, set, update, delete, exec, or execute.
             url: Documented API URL beginning with '/', for example '/sys/status'.
             data: Optional endpoint request body placed in the RPC data member.
             params: Optional RPC controls such as filter, fields, option, loadsub,
@@ -151,52 +151,33 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
         result = await c.get_device_groups(adom)
         return json.dumps(result, indent=2)
 
-    @mcp.tool()
-    async def faz_register_device(
-        device_id: str, device_data: dict, adom: Optional[str] = None
-    ) -> str:
-        """Register a FortiGate device with a FortiAnalyzer for log collection.
-
-        Args:
-            device_id: ID of the FortiAnalyzer instance from config.
-            device_data: Device registration data. Example:
-                         {"name": "fgt-01", "ip": "192.168.1.1", "adm_usr": "admin",
-                          "adm_pass": "password"}
-            adom: ADOM name (uses default from config if not specified).
-        """
-        c = get_client(device_id)
-        await c.login()
-        result = await c.register_device(device_data, adom)
-        return json.dumps(result, indent=2)
-
     # ── Log Queries ──────────────────────────────────────────────────────────
 
     @mcp.tool()
     async def faz_query_logs(
         device_id: str,
+        time_from: str | int,
+        time_to: str | int,
         log_type: str = "traffic",
-        device: str = "All_FortiGate",
-        filter: Optional[list] = None,
-        time_from: Optional[int] = None,
-        time_to: Optional[int] = None,
+        device: str | list[dict] = "All_FortiGate",
+        filter: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
-        fields: Optional[list[str]] = None,
+        timezone: Optional[str] = None,
         adom: Optional[str] = None,
     ) -> str:
-        """Query logs on a FortiAnalyzer with optional filters.
+        """Start a FortiAnalyzer v8 log search and return its task ID.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            log_type: Log type: traffic, event, utm, virus, webfilter, ips, app-ctrl, etc.
-            device: Device name or "All_FortiGate" for all devices.
-            filter: List of filter conditions. Example:
-                    [["srcip", "==", "10.0.0.1"], "&&", ["action", "==", "deny"]]
-            time_from: Start time as Unix timestamp (epoch seconds).
-            time_to: End time as Unix timestamp (epoch seconds).
+            time_from: RFC 3339 date-time or Unix timestamp for the search start.
+            time_to: RFC 3339 date-time or Unix timestamp for the search end.
+            log_type: Official v8 log type such as traffic, event, virus, or webfilter.
+            device: All-device ID or list of official device selector objects.
+            filter: FortiAnalyzer filter expression string.
             limit: Max results to return (default 100).
             offset: Pagination offset (default 0).
-            fields: List of specific fields to return (returns all if not specified).
+            timezone: Optional FortiAnalyzer timezone name or index.
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
@@ -210,58 +191,103 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
             time_to=time_to,
             limit=limit,
             offset=offset,
-            fields=fields,
+            timezone_name=timezone,
         )
         return json.dumps(result, indent=2)
 
     @mcp.tool()
     async def faz_get_log_fields(
-        device_id: str, log_type: str = "traffic", adom: Optional[str] = None
+        device_id: str,
+        log_type: str = "traffic",
+        device_type: str = "FortiGate",
+        subtype: str = "",
+        adom: Optional[str] = None,
     ) -> str:
         """Get available log fields for a log type on FortiAnalyzer.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            log_type: Log type to inspect: traffic, event, utm, etc.
+            log_type: Official v8 log type to inspect.
+            device_type: Device family, such as FortiGate or FortiAnalyzer.
+            subtype: Optional log subtype.
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_log_fields(log_type, adom)
+        result = await c.get_log_fields(log_type, adom, device_type, subtype)
         return json.dumps(result, indent=2)
 
     @mcp.tool()
     async def faz_search_logs(
         device_id: str,
-        log_type: str,
-        filter: list,
-        time_from: int,
-        time_to: int,
-        limit: int = 1000,
+        time_from: str | int,
+        time_to: str | int,
+        log_type: str = "traffic",
+        filter: Optional[str] = None,
+        device: str | list[dict] = "All_FortiGate",
+        limit: int = 100,
         adom: Optional[str] = None,
     ) -> str:
         """Start an async log search job on FortiAnalyzer. Returns a job ID for polling.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            log_type: Log type: traffic, event, utm, virus, webfilter, ips, etc.
-            filter: Filter conditions list. Example:
-                    [["dstip", "==", "8.8.8.8"]]
-            time_from: Search start time as Unix timestamp.
-            time_to: Search end time as Unix timestamp.
-            limit: Maximum results (default 1000).
+            time_from: RFC 3339 date-time or Unix timestamp for the search start.
+            time_to: RFC 3339 date-time or Unix timestamp for the search end.
+            log_type: Official v8 log type.
+            filter: FortiAnalyzer filter expression string.
+            device: All-device ID or list of official device selector objects.
+            limit: Maximum results requested from the search task.
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.start_log_search(adom, log_type, filter, time_from, time_to, limit)
+        result = await c.start_log_search(
+            adom, log_type, filter, time_from, time_to, limit, device
+        )
+        return json.dumps(result, indent=2)
+
+    @mcp.tool()
+    async def faz_get_log_search_results(
+        device_id: str,
+        task_id: int,
+        limit: int = 50,
+        offset: int = 0,
+        adom: Optional[str] = None,
+    ) -> str:
+        """Poll or page through results from a FortiAnalyzer v8 log-search task."""
+        result = await get_client(device_id).get_log_search_results(task_id, adom, limit, offset)
+        return json.dumps(result, indent=2)
+
+    @mcp.tool()
+    async def faz_get_log_search_count(
+        device_id: str, task_id: int, adom: Optional[str] = None
+    ) -> str:
+        """Get the current result count for a FortiAnalyzer v8 log-search task."""
+        result = await get_client(device_id).get_log_search_count(task_id, adom)
+        return json.dumps(result, indent=2)
+
+    @mcp.tool()
+    async def faz_delete_log_search(
+        device_id: str, task_id: int, adom: Optional[str] = None
+    ) -> str:
+        """Delete a completed FortiAnalyzer v8 log-search task."""
+        result = await get_client(device_id).delete_log_search(task_id, adom)
         return json.dumps(result, indent=2)
 
     # ── Reports ──────────────────────────────────────────────────────────────
 
     @mcp.tool()
-    async def faz_get_reports(device_id: str, adom: Optional[str] = None) -> str:
-        """List generated reports on a FortiAnalyzer.
+    async def faz_get_reports(
+        device_id: str,
+        state: str,
+        time_from: Optional[str | int] = None,
+        time_to: Optional[str | int] = None,
+        timezone: Optional[str] = None,
+        title: Optional[str] = None,
+        adom: Optional[str] = None,
+    ) -> str:
+        """List generated reports in an official FortiAnalyzer report state.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
@@ -269,11 +295,16 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_reports(adom)
+        result = await c.get_reports(state, adom, time_from, time_to, timezone, title)
         return json.dumps(result, indent=2)
 
     @mcp.tool()
-    async def faz_get_report_templates(device_id: str, adom: Optional[str] = None) -> str:
+    async def faz_get_report_templates(
+        device_id: str,
+        device_type: str = "fgt",
+        language: str = "en",
+        adom: Optional[str] = None,
+    ) -> str:
         """List available report templates on a FortiAnalyzer.
 
         Args:
@@ -282,31 +313,28 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_report_templates(adom)
+        result = await c.get_report_templates(adom, device_type, language)
         return json.dumps(result, indent=2)
 
     @mcp.tool()
     async def faz_run_report(
         device_id: str,
-        template_name: str,
-        time_from: int,
-        time_to: int,
-        device: str = "All_FortiGate",
+        schedule: Optional[str] = None,
+        schedule_params: Optional[dict] = None,
         adom: Optional[str] = None,
     ) -> str:
-        """Run a report from a template on FortiAnalyzer. Returns a task ID.
+        """Start a v8 report task from a schedule or schedule parameters.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            template_name: Name of the report template to use.
-            time_from: Report start time as Unix timestamp.
-            time_to: Report end time as Unix timestamp.
-            device: Device or device group name (default: All_FortiGate).
+            schedule: Existing report schedule name or ID.
+            schedule_params: Official schedule-param object. Without a schedule,
+                             layout-id, device, and time-period are required by v8.
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.run_report(template_name, time_from, time_to, device, adom)
+        result = await c.run_report(schedule, schedule_params, adom)
         return json.dumps(result, indent=2)
 
     @mcp.tool()
@@ -327,7 +355,11 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
 
     @mcp.tool()
     async def faz_download_report(
-        device_id: str, task_id: int, adom: Optional[str] = None
+        device_id: str,
+        task_id: int,
+        report_format: str = "PDF",
+        data_type: Optional[str] = None,
+        adom: Optional[str] = None,
     ) -> str:
         """Download a completed FortiAnalyzer report through JSON-RPC.
 
@@ -337,7 +369,7 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
-        result = await c.download_report(task_id, adom)
+        result = await c.download_report(task_id, adom, report_format, data_type)
         return json.dumps(result, indent=2)
 
     # ── Incidents & Events ───────────────────────────────────────────────────
@@ -345,54 +377,75 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
     @mcp.tool()
     async def faz_get_incidents(
         device_id: str,
-        status: Optional[str] = None,
+        filter: Optional[str] = None,
         limit: int = 50,
+        offset: int = 0,
+        detail_level: Optional[str] = None,
         adom: Optional[str] = None,
     ) -> str:
         """List security incidents on a FortiAnalyzer.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            status: Optional filter by status: open, closed, in-progress.
+            filter: FortiAnalyzer incident filter expression string.
             limit: Maximum incidents to return (default 50).
+            offset: Pagination offset.
+            detail_level: Optional response detail level.
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_incidents(adom, status, limit)
+        result = await c.get_incidents(adom, filter, limit, offset, detail_level)
         return json.dumps(result, indent=2)
 
     @mcp.tool()
     async def faz_get_events(
         device_id: str,
-        severity: Optional[str] = None,
-        limit: int = 100,
+        filter: Optional[str] = None,
+        limit: int = 1000,
+        offset: int = 0,
+        time_from: Optional[str | int] = None,
+        time_to: Optional[str | int] = None,
+        timezone: Optional[str] = None,
         adom: Optional[str] = None,
     ) -> str:
         """List security events on a FortiAnalyzer.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            severity: Optional filter: critical, high, medium, low, info.
-            limit: Maximum events to return (default 100).
+            filter: FortiAnalyzer alert filter expression string.
+            limit: Maximum alerts to return (default 1000).
+            offset: Pagination offset.
+            time_from: Optional RFC 3339 date-time or Unix timestamp.
+            time_to: Optional RFC 3339 date-time or Unix timestamp.
+            timezone: Optional FortiAnalyzer timezone name or index.
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_events(adom, severity, limit)
+        result = await c.get_events(
+            adom, filter, limit, offset, time_from, time_to, timezone
+        )
         return json.dumps(result, indent=2)
 
     @mcp.tool()
-    async def faz_get_event_handlers(device_id: str, adom: Optional[str] = None) -> str:
-        """List event alert handlers configured on a FortiAnalyzer.
+    async def faz_get_event_handlers(
+        device_id: str,
+        alert_ids: list[str],
+        rule_id: Optional[str] = None,
+        adom: Optional[str] = None,
+    ) -> str:
+        """Get event-handler filters associated with specific alert IDs.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
+            alert_ids: Alert IDs required by the v8 alertfilter endpoint.
+            rule_id: Optional handler rule ID.
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_event_handlers(adom)
+        result = await c.get_event_handlers(alert_ids, adom, rule_id)
         return json.dumps(result, indent=2)
 
     # ── FortiView / Statistics ───────────────────────────────────────────────
@@ -400,99 +453,154 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
     @mcp.tool()
     async def faz_get_traffic_summary(
         device_id: str,
-        time_period: int = 86400,
-        device: str = "All_FortiGate",
+        device: str | list[dict] = "All_FortiGate",
         adom: Optional[str] = None,
     ) -> str:
-        """Get traffic summary statistics from FortiAnalyzer.
+        """Get official v8 log statistics for selected devices.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            time_period: Time window in seconds (default 86400 = 24 hours).
-            device: Device name or "All_FortiGate".
+            device: All-device ID or list of official device selector objects.
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_traffic_summary(adom, time_period, device)
+        result = await c.get_traffic_summary(adom, device)
         return json.dumps(result, indent=2)
 
     @mcp.tool()
     async def faz_get_threat_summary(
         device_id: str,
-        time_period: int = 86400,
-        device: str = "All_FortiGate",
+        time_from: str | int,
+        time_to: str | int,
+        limit: int = 1000,
         adom: Optional[str] = None,
     ) -> str:
-        """Get threat/security summary statistics from FortiAnalyzer.
+        """Start the official v8 top-threats FortiView task.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            time_period: Time window in seconds (default 86400 = 24 hours).
-            device: Device name or "All_FortiGate".
+            time_from: RFC 3339 date-time or Unix timestamp.
+            time_to: RFC 3339 date-time or Unix timestamp.
+            limit: Maximum rows requested from the task.
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_threat_summary(adom, time_period, device)
+        result = await c.get_top_threats(time_from, time_to, adom, limit)
+        return json.dumps(result, indent=2)
+
+    @mcp.tool()
+    async def faz_start_fortiview(
+        device_id: str,
+        view_name: str,
+        time_from: str | int,
+        time_to: str | int,
+        device: Optional[str | list[dict]] = None,
+        filter: Optional[str] = None,
+        limit: int = 1000,
+        offset: int = 0,
+        timezone: Optional[str] = None,
+        adom: Optional[str] = None,
+    ) -> str:
+        """Start any documented v8 FortiView task and return its task ID."""
+        result = await get_client(device_id).start_fortiview(
+            view_name,
+            time_from,
+            time_to,
+            adom,
+            device,
+            filter,
+            limit,
+            offset,
+            timezone,
+        )
+        return json.dumps(result, indent=2)
+
+    @mcp.tool()
+    async def faz_get_fortiview_results(
+        device_id: str,
+        view_name: str,
+        task_id: int,
+        adom: Optional[str] = None,
+    ) -> str:
+        """Poll results from a v8 FortiView task."""
+        result = await get_client(device_id).get_fortiview_results(view_name, task_id, adom)
+        return json.dumps(result, indent=2)
+
+    @mcp.tool()
+    async def faz_delete_fortiview(
+        device_id: str,
+        view_name: str,
+        task_id: int,
+        adom: Optional[str] = None,
+    ) -> str:
+        """Delete a completed v8 FortiView task."""
+        result = await get_client(device_id).delete_fortiview(view_name, task_id, adom)
         return json.dumps(result, indent=2)
 
     @mcp.tool()
     async def faz_get_top_sources(
         device_id: str,
-        time_period: int = 3600,
+        time_from: str | int,
+        time_to: str | int,
         limit: int = 20,
         adom: Optional[str] = None,
     ) -> str:
-        """Get top traffic source IPs from FortiAnalyzer FortiView.
+        """Start the official v8 top-sources FortiView task.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            time_period: Time window in seconds (default 3600 = 1 hour).
+            time_from: RFC 3339 date-time or Unix timestamp.
+            time_to: RFC 3339 date-time or Unix timestamp.
             limit: Number of top entries to return (default 20).
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_top_sources(adom, time_period, limit)
+        result = await c.get_top_sources(time_from, time_to, adom, limit)
         return json.dumps(result, indent=2)
 
     @mcp.tool()
     async def faz_get_top_threats(
         device_id: str,
-        time_period: int = 3600,
+        time_from: str | int,
+        time_to: str | int,
         limit: int = 20,
         adom: Optional[str] = None,
     ) -> str:
-        """Get top security threats detected by FortiAnalyzer FortiView.
+        """Start the official v8 top-threats FortiView task.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            time_period: Time window in seconds (default 3600 = 1 hour).
+            time_from: RFC 3339 date-time or Unix timestamp.
+            time_to: RFC 3339 date-time or Unix timestamp.
             limit: Number of top entries to return (default 20).
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_top_threats(adom, time_period, limit)
+        result = await c.get_top_threats(time_from, time_to, adom, limit)
         return json.dumps(result, indent=2)
 
     @mcp.tool()
     async def faz_get_top_applications(
         device_id: str,
-        time_period: int = 3600,
+        time_from: str | int,
+        time_to: str | int,
         limit: int = 20,
         adom: Optional[str] = None,
     ) -> str:
-        """Get top applications by traffic volume from FortiAnalyzer FortiView.
+        """Start the official v8 top-applications FortiView task.
 
         Args:
             device_id: ID of the FortiAnalyzer instance from config.
-            time_period: Time window in seconds (default 3600 = 1 hour).
+            time_from: RFC 3339 date-time or Unix timestamp.
+            time_to: RFC 3339 date-time or Unix timestamp.
             limit: Number of top entries to return (default 20).
             adom: ADOM name (uses default from config if not specified).
         """
         c = get_client(device_id)
         await c.login()
-        result = await c.get_top_applications(adom, time_period, limit)
+        result = await c.get_top_applications(time_from, time_to, adom, limit)
         return json.dumps(result, indent=2)

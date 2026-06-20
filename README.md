@@ -189,23 +189,28 @@ Or for **stdio mode** (no Docker required):
 | `faz_get_adoms` | List ADOMs |
 | `faz_get_registered_devices` | List log-sending devices |
 | `faz_get_device_groups` | List device groups |
-| `faz_register_device` | Register a new device |
-| `faz_query_logs` | Query logs with filters |
+| `faz_query_logs` | Start an asynchronous v8 log search |
 | `faz_get_log_fields` | Available log fields |
-| `faz_search_logs` | Start async log search |
-| `faz_get_reports` | List generated reports |
+| `faz_search_logs` | Alias for starting a v8 log search |
+| `faz_get_log_search_results` | Poll/page log-search results |
+| `faz_get_log_search_count` | Get a log-search result count |
+| `faz_delete_log_search` | Delete a completed log-search task |
+| `faz_get_reports` | List generated reports by state |
 | `faz_get_report_templates` | List report templates |
 | `faz_run_report` | Generate a report |
 | `faz_get_report_status` | Check report task status |
 | `faz_download_report` | Download a completed report |
 | `faz_get_incidents` | List security incidents |
-| `faz_get_events` | List security events |
-| `faz_get_event_handlers` | List event alert handlers |
-| `faz_get_traffic_summary` | Traffic statistics |
-| `faz_get_threat_summary` | Threat statistics |
-| `faz_get_top_sources` | Top source IPs |
-| `faz_get_top_threats` | Top detected threats |
-| `faz_get_top_applications` | Top applications by traffic |
+| `faz_get_events` | List security alerts |
+| `faz_get_event_handlers` | Get handler filters for alert IDs |
+| `faz_get_traffic_summary` | Device log statistics |
+| `faz_start_fortiview` | Start any documented FortiView task |
+| `faz_get_fortiview_results` | Poll a FortiView task |
+| `faz_delete_fortiview` | Delete a completed FortiView task |
+| `faz_get_threat_summary` | Start the top-threats FortiView task |
+| `faz_get_top_sources` | Start the top-sources FortiView task |
+| `faz_get_top_threats` | Start the top-threats FortiView task |
+| `faz_get_top_applications` | Start the top-applications FortiView task |
 
 #### Full FortiAnalyzer v8 API coverage
 
@@ -214,11 +219,16 @@ tools above cover common system, device, log, report, incident, event, and
 FortiView operations. `faz_api_request` provides access to the rest of the
 documented v8 API without requiring a new MCP release for every endpoint.
 
-The tool accepts all FortiAnalyzer JSON-RPC methods supported by this server:
-`get`, `add`, `set`, `update`, `delete`, and `exec`. The `url` must be a
-documented absolute API path. Put the endpoint body in `data`; put JSON-RPC
-controls such as `filter`, `fields`, `option`, `loadsub`, `range`, `sortings`,
-`target`, and `flags` in `params`.
+The tool accepts every method present in the official FortiAnalyzer 8.0.0
+OpenAPI document: `get`, `add`, `set`, `update`, `delete`, `exec`, and
+`execute`. The `url` must be a
+documented absolute API path. Match the official operation schema exactly:
+configuration operations generally put their object in `data`, while operational
+APIs commonly put fields such as `apiver`, `filter`, `device`, `time-range`,
+`fields`, `option`, `loadsub`, `range`, and `sortings` directly in `params`.
+
+See [FortiAnalyzer 8 API operations](docs/FORTIANALYZER_8_API.md) for the
+specification audit and the required asynchronous task lifecycles.
 
 Example read:
 
