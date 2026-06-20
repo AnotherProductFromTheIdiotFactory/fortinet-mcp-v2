@@ -21,12 +21,21 @@ methods. This generic surface is how the MCP exposes the complete
 version-dependent FortiOS REST API without creating and maintaining thousands
 of individual tools.
 
+The MCP also exposes domain-specific FortiOS suites:
+
+- `fgt_cmdb_request` / `fgt_cmdb_batch` for configuration paths
+- `fgt_monitor_request` / `fgt_monitor_batch` for monitor paths
+- `fgt_log_request` / `fgt_log_batch` for log paths
+- `fgt_service_request` / `fgt_service_batch` for service paths
+
 ## Request shape
 
 Use the exact request fields documented for the selected endpoint.
 
 - Use `fgt_api_request.path` with the full FortiGate REST path beginning with
   `/api/v2/`.
+- Domain-specific tools accept either a relative path such as `system/status`
+  or a full matching `/api/v2/<domain>/...` path.
 - Use `fgt_api_request.params` for query parameters such as `vdom`, `filter`,
   `start`, `count`, `scope`, or action controls.
 - Use `fgt_api_request.data` only for the JSON body required by `post` and
@@ -52,8 +61,8 @@ a typed FortiGate toolset for common operational tasks such as:
 - IPsec and SSL-VPN inspection and configuration
 - sessions, FortiView statistics, threat feeds, and disk logs
 
-The generic `fgt_api_request` tool covers the remaining documented FortiOS 8
-REST endpoints that do not have a dedicated typed tool.
+The generic and domain-scoped request tools cover the remaining FortiOS 8 REST
+endpoints that do not have a dedicated typed tool.
 
 ## Verified common paths
 
@@ -70,7 +79,8 @@ the supplied FortiOS 8 export, including:
 - `/api/v2/cmdb/vpn.ipsec/phase1-interface`
 - `/api/v2/cmdb/vpn.ssl/settings`
 
-Operational monitor and log endpoints such as `/api/v2/monitor/...` and
-`/api/v2/log/...` are outside the attached CMDB Swagger export, but they remain
-supported by the MCP because they are part of the FortiGate REST API surface
-used by the existing operational tools.
+Operational monitor, log, and service endpoints such as `/api/v2/monitor/...`,
+`/api/v2/log/...`, and `/api/v2/service/...` are outside the attached CMDB
+Swagger export, but they remain supported by the MCP because they are part of
+the broader FortiGate REST API surface and are now available through explicit
+domain-scoped MCP tools.

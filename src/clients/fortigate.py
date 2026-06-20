@@ -11,6 +11,7 @@ class FortiGateClient:
     """FortiGate REST API client (API v2)."""
 
     SUPPORTED_METHODS = frozenset({"get", "post", "put", "delete"})
+    SUPPORTED_DOMAINS = frozenset({"cmdb", "monitor", "log", "service"})
     SESSION_ERROR_STATUSES = frozenset({401, 403})
     SESSION_ENDPOINTS = frozenset({"/logincheck", "/logout"})
 
@@ -63,6 +64,31 @@ class FortiGateClient:
         if "json" in content_type:
             return resp.json()
         return resp.text
+
+    @classmethod
+    def _normalize_domain_path(cls, domain: str, path: str) -> str:
+        normalized_domain = domain.lower().strip().strip("/")
+        if normalized_domain not in cls.SUPPORTED_DOMAINS:
+            supported = ", ".join(sorted(cls.SUPPORTED_DOMAINS))
+            raise ValueError(f"Unsupported FortiGate API domain '{domain}'. Use: {supported}")
+
+        normalized_path = path.strip()
+        if not normalized_path:
+            raise ValueError("FortiGate domain path must not be empty")
+        if normalized_path.startswith("//"):
+            raise ValueError("FortiGate domain path must not start with '//'")
+        if normalized_path.startswith("/api/v2/"):
+            expected_prefix = f"/api/v2/{normalized_domain}/"
+            if not normalized_path.startswith(expected_prefix):
+                raise ValueError(
+                    f"FortiGate {normalized_domain} domain paths must start with '{expected_prefix}'"
+                )
+            return normalized_path
+
+        relative_path = normalized_path.lstrip("/")
+        if not relative_path:
+            raise ValueError("FortiGate domain path must not be empty")
+        return f"/api/v2/{normalized_domain}/{relative_path}"
 
     async def login(self):
         if self._cfg.api_key:
@@ -129,6 +155,24 @@ class FortiGateClient:
                 )
             raise
         return self._decode_response(resp)
+
+    async def domain_request(
+        self,
+        domain: str,
+        method: str,
+        path: str,
+        data: Any = None,
+        params: Optional[dict] = None,
+        include_vdom: bool = True,
+    ) -> Any:
+        """Call a FortiGate REST API endpoint within a specific v2 domain."""
+        return await self.request(
+            method,
+            self._normalize_domain_path(domain, path),
+            data=data,
+            params=params,
+            include_vdom=include_vdom,
+        )
 
     async def get(self, path: str, params: Optional[dict] = None, include_vdom: bool = True) -> Any:
         return await self.request("get", path, params=params, include_vdom=include_vdom)

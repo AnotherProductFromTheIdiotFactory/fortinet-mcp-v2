@@ -4,7 +4,7 @@ Tools are registered only when the corresponding product has at least one
 entry in `config.yaml`. Every operational tool uses a configured `device_id`.
 Run the product's list tool first.
 
-## FortiGate (48)
+## FortiGate (56)
 
 ### Discovery and Complete API
 
@@ -13,6 +13,14 @@ Run the product's list tool first.
 | `fgt_list_devices` | List configured FortiGate devices |
 | `fgt_api_request` | Call any documented FortiGate REST v2 endpoint |
 | `fgt_api_batch` | Execute up to 50 ordered REST operations |
+| `fgt_cmdb_request` | Call FortiGate configuration endpoints under `/api/v2/cmdb/` |
+| `fgt_cmdb_batch` | Execute ordered configuration requests |
+| `fgt_monitor_request` | Call FortiGate monitor endpoints under `/api/v2/monitor/` |
+| `fgt_monitor_batch` | Execute ordered monitor requests |
+| `fgt_log_request` | Call FortiGate log endpoints under `/api/v2/log/` |
+| `fgt_log_batch` | Execute ordered log requests |
+| `fgt_service_request` | Call FortiGate service endpoints under `/api/v2/service/` |
+| `fgt_service_batch` | Execute ordered service requests |
 | `fgt_get_system_status` | Firmware, serial number, and uptime |
 | `fgt_get_system_resources` | CPU and memory usage |
 | `fgt_get_interfaces` | Network interfaces |
@@ -74,10 +82,10 @@ Run the product's list tool first.
 | `fgt_get_threat_feeds` | Configured threat feeds |
 | `fgt_get_logs` | Retrieve FortiGate disk logs |
 
-Use a typed tool when one matches the workflow. Use `fgt_api_request` for an
-official REST endpoint that does not have a dedicated convenience tool.
-`fgt_api_batch` executes related operations in order and stops on the first
-failure.
+Use a typed tool when one matches the workflow. Use `fgt_cmdb_request`,
+`fgt_monitor_request`, `fgt_log_request`, or `fgt_service_request` when you
+want explicit domain scoping. Use `fgt_api_request` when the request needs to
+cross domains or when the domain is already embedded in the full FortiOS path.
 
 Write-capable tools include CLI execution, all create/update/delete/reorder
 operations, and generic API calls using `post`, `put`, or `delete`. Read

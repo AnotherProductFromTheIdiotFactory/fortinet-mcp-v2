@@ -27,6 +27,46 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
             return result
         return json.dumps(result, indent=2)
 
+    async def domain_request(
+        device_id: str,
+        domain: str,
+        method: str,
+        path: str,
+        data: Optional[Any] = None,
+        params: Optional[dict] = None,
+    ) -> str:
+        c = get_client(device_id)
+        result = await c.domain_request(domain, method, path, data=data, params=params)
+        return dump(result)
+
+    async def domain_batch(device_id: str, domain: str, requests: list[dict]) -> str:
+        if not requests:
+            raise ValueError("requests must contain at least one operation")
+        if len(requests) > 50:
+            raise ValueError(f"fgt_{domain}_batch accepts at most 50 operations")
+
+        c = get_client(device_id)
+        results = []
+        for index, request in enumerate(requests):
+            if not isinstance(request, dict):
+                raise ValueError(f"requests[{index}] must be an object")
+            unknown = set(request) - {"method", "path", "data", "params"}
+            if unknown:
+                names = ", ".join(sorted(unknown))
+                raise ValueError(f"requests[{index}] has unsupported key(s): {names}")
+            if "method" not in request or "path" not in request:
+                raise ValueError(f"requests[{index}] requires method and path")
+            results.append(
+                await c.domain_request(
+                    domain,
+                    request["method"],
+                    request["path"],
+                    data=request.get("data"),
+                    params=request.get("params"),
+                )
+            )
+        return dump(results)
+
     # ── Discovery ───────────────────────────────────────────────────────────
 
     @mcp.tool()
@@ -102,6 +142,105 @@ def register_fortigate_tools(mcp: FastMCP, config: Config):
                 )
             )
         return dump(results)
+
+    @mcp.tool()
+    async def fgt_cmdb_request(
+        device_id: str,
+        method: str,
+        path: str,
+        data: Optional[Any] = None,
+        params: Optional[dict] = None,
+    ) -> str:
+        """Call a FortiGate configuration endpoint under `/api/v2/cmdb/`.
+
+        Args:
+            device_id: ID of the FortiGate device from config.
+            method: HTTP method: get, post, put, or delete.
+            path: Relative CMDB path like `firewall/policy` or absolute
+                  `/api/v2/cmdb/...` path.
+            data: Optional JSON request body for post and put requests.
+            params: Optional query parameters such as vdom, filter, start, or count.
+        """
+        return await domain_request(device_id, "cmdb", method, path, data, params)
+
+    @mcp.tool()
+    async def fgt_cmdb_batch(device_id: str, requests: list[dict]) -> str:
+        """Run an ordered batch of FortiGate configuration requests under `/api/v2/cmdb/`."""
+        return await domain_batch(device_id, "cmdb", requests)
+
+    @mcp.tool()
+    async def fgt_monitor_request(
+        device_id: str,
+        method: str,
+        path: str,
+        data: Optional[Any] = None,
+        params: Optional[dict] = None,
+    ) -> str:
+        """Call a FortiGate monitoring endpoint under `/api/v2/monitor/`.
+
+        Args:
+            device_id: ID of the FortiGate device from config.
+            method: HTTP method: get, post, put, or delete.
+            path: Relative monitor path like `system/status` or absolute
+                  `/api/v2/monitor/...` path.
+            data: Optional JSON request body for post and put requests.
+            params: Optional query parameters such as vdom, count, filter, or scope.
+        """
+        return await domain_request(device_id, "monitor", method, path, data, params)
+
+    @mcp.tool()
+    async def fgt_monitor_batch(device_id: str, requests: list[dict]) -> str:
+        """Run an ordered batch of FortiGate monitoring requests under `/api/v2/monitor/`."""
+        return await domain_batch(device_id, "monitor", requests)
+
+    @mcp.tool()
+    async def fgt_log_request(
+        device_id: str,
+        method: str,
+        path: str,
+        data: Optional[Any] = None,
+        params: Optional[dict] = None,
+    ) -> str:
+        """Call a FortiGate log endpoint under `/api/v2/log/`.
+
+        Args:
+            device_id: ID of the FortiGate device from config.
+            method: HTTP method: get, post, put, or delete.
+            path: Relative log path like `disk/traffic` or absolute
+                  `/api/v2/log/...` path.
+            data: Optional JSON request body for post and put requests.
+            params: Optional query parameters such as vdom, subtype, rows, or filter.
+        """
+        return await domain_request(device_id, "log", method, path, data, params)
+
+    @mcp.tool()
+    async def fgt_log_batch(device_id: str, requests: list[dict]) -> str:
+        """Run an ordered batch of FortiGate log requests under `/api/v2/log/`."""
+        return await domain_batch(device_id, "log", requests)
+
+    @mcp.tool()
+    async def fgt_service_request(
+        device_id: str,
+        method: str,
+        path: str,
+        data: Optional[Any] = None,
+        params: Optional[dict] = None,
+    ) -> str:
+        """Call a FortiGate service endpoint under `/api/v2/service/`.
+
+        Args:
+            device_id: ID of the FortiGate device from config.
+            method: HTTP method: get, post, put, or delete.
+            path: Relative service path or absolute `/api/v2/service/...` path.
+            data: Optional JSON request body for post and put requests.
+            params: Optional query parameters documented for the service endpoint.
+        """
+        return await domain_request(device_id, "service", method, path, data, params)
+
+    @mcp.tool()
+    async def fgt_service_batch(device_id: str, requests: list[dict]) -> str:
+        """Run an ordered batch of FortiGate service requests under `/api/v2/service/`."""
+        return await domain_batch(device_id, "service", requests)
 
     # ── System ──────────────────────────────────────────────────────────────
 

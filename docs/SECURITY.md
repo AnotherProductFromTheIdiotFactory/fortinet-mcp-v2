@@ -28,10 +28,12 @@ Separate read-only and change-capable deployments when possible. A monitoring
 client does not need firewall-policy writes, script execution, installs,
 generic FortiGate mutation access, or generic FortiAnalyzer mutation access.
 
-FortiGate `fgt_api_request` is intentionally broad. The server validates the
-HTTP method and path form, but authorization is enforced by the appliance. Use
-an API profile or administrator account limited to the required VDOMs and API
-areas.
+FortiGate `fgt_api_request` is intentionally broad. The domain-scoped
+`fgt_cmdb_request`, `fgt_monitor_request`, `fgt_log_request`, and
+`fgt_service_request` tools narrow path shape but still inherit the appliance
+account's privileges. The server validates method and path form, but
+authorization is enforced by the appliance. Use an API profile or
+administrator account limited to the required VDOMs and API areas.
 
 FortiAnalyzer `faz_api_request` is intentionally broad. The server validates the
 JSON-RPC method and URL form, but authorization is enforced by the appliance.

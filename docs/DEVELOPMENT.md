@@ -66,10 +66,10 @@ The expected counts for this branch are:
 
 | Product | Tools |
 |---|---:|
-| FortiGate | 48 |
+| FortiGate | 56 |
 | FortiManager | 31 |
 | FortiAnalyzer | 29 |
-| Total | 108 |
+| Total | 116 |
 
 Update this table and `TOOL_REFERENCE.md` whenever tools are added or removed.
 
@@ -94,7 +94,9 @@ For a typed FortiGate change:
 2. Record the HTTP method and whether the endpoint is CMDB, monitor, or log.
 3. Confirm whether `vdom` belongs in the query string.
 4. Add a test that inspects the exact outgoing request path, query, and auth.
-5. Prefer `fgt_api_request` instead of adding a thin tool for one-off CMDB objects.
+5. Prefer `fgt_cmdb_request`, `fgt_monitor_request`, `fgt_log_request`,
+   `fgt_service_request`, or `fgt_api_request` instead of adding a thin tool
+   for one-off endpoints.
 
 ## Documentation Review
 

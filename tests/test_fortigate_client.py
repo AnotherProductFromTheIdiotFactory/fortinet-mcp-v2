@@ -119,6 +119,55 @@ class FortiGateClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "backup-content")
         await client.close()
 
+    async def test_domain_request_builds_relative_paths(self):
+        seen = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return response({"status": "success", "results": []})
+
+        client = self.make_client(handler, api_key="token-123")
+        result = await client.domain_request(
+            "monitor",
+            "get",
+            "system/status",
+            include_vdom=False,
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(seen[0].url.path, "/api/v2/monitor/system/status")
+        await client.close()
+
+    async def test_domain_request_accepts_matching_absolute_paths(self):
+        seen = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return response({"status": "success"})
+
+        client = self.make_client(handler, api_key="token-123")
+        await client.domain_request(
+            "log",
+            "get",
+            "/api/v2/log/disk/traffic",
+            params={"rows": 10},
+        )
+
+        self.assertEqual(seen[0].url.path, "/api/v2/log/disk/traffic")
+        self.assertEqual(seen[0].url.params["rows"], "10")
+        self.assertEqual(seen[0].url.params["vdom"], "root")
+        await client.close()
+
+    def test_domain_path_validation_rejects_empty_or_mismatched_paths(self):
+        for domain, path in [
+            ("cmdb", ""),
+            ("monitor", "//system/status"),
+            ("service", "/api/v2/log/disk/traffic"),
+            ("unknown", "system/status"),
+        ]:
+            with self.subTest(domain=domain, path=path), self.assertRaises(ValueError):
+                FortiGateClient._normalize_domain_path(domain, path)
+
     def test_request_validation_rejects_unsafe_or_unknown_targets(self):
         for method, path in [
             ("patch", "/api/v2/cmdb/firewall/address"),

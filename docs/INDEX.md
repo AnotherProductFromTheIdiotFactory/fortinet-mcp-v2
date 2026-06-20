@@ -11,7 +11,7 @@
 - [Operations](OPERATIONS.md): lifecycle, monitoring, upgrades, backup, and recovery.
 - [FortiAnalyzer runbook](FORTIANALYZER_RUNBOOK.md): logs, reports, incidents,
   alerts, FortiView, and generic v8 API calls.
-- [Tool reference](TOOL_REFERENCE.md): all 108 registered tools.
+- [Tool reference](TOOL_REFERENCE.md): all 116 registered tools.
 - [Troubleshooting](TROUBLESHOOTING.md): common failures and diagnostics.
 - [Security](SECURITY.md): permissions, secrets, TLS, network exposure, and audit.
 
