@@ -183,6 +183,8 @@ Or for **stdio mode** (no Docker required):
 ### FortiAnalyzer (prefix `faz_`)
 | Tool | Description |
 |---|---|
+| `faz_api_request` | Call any documented v8 JSON-RPC method and URL |
+| `faz_api_batch` | Run up to 50 ordered v8 JSON-RPC operations |
 | `faz_get_system_status` | Version, serial, disk usage |
 | `faz_get_adoms` | List ADOMs |
 | `faz_get_registered_devices` | List log-sending devices |
@@ -195,6 +197,7 @@ Or for **stdio mode** (no Docker required):
 | `faz_get_report_templates` | List report templates |
 | `faz_run_report` | Generate a report |
 | `faz_get_report_status` | Check report task status |
+| `faz_download_report` | Download a completed report |
 | `faz_get_incidents` | List security incidents |
 | `faz_get_events` | List security events |
 | `faz_get_event_handlers` | List event alert handlers |
@@ -203,6 +206,54 @@ Or for **stdio mode** (no Docker required):
 | `faz_get_top_sources` | Top source IPs |
 | `faz_get_top_threats` | Top detected threats |
 | `faz_get_top_applications` | Top applications by traffic |
+
+#### Full FortiAnalyzer v8 API coverage
+
+FortiAnalyzer exposes a large, version-dependent JSON-RPC URL tree. The typed
+tools above cover common system, device, log, report, incident, event, and
+FortiView operations. `faz_api_request` provides access to the rest of the
+documented v8 API without requiring a new MCP release for every endpoint.
+
+The tool accepts all FortiAnalyzer JSON-RPC methods supported by this server:
+`get`, `add`, `set`, `update`, `delete`, and `exec`. The `url` must be a
+documented absolute API path. Put the endpoint body in `data`; put JSON-RPC
+controls such as `filter`, `fields`, `option`, `loadsub`, `range`, `sortings`,
+`target`, and `flags` in `params`.
+
+Example read:
+
+```json
+{
+  "device_id": "faz-01",
+  "method": "get",
+  "url": "/dvmdb/adom/root/device",
+  "params": {
+    "fields": ["name", "ip", "sn"],
+    "range": [0, 99]
+  }
+}
+```
+
+Example configuration operation:
+
+```json
+{
+  "device_id": "faz-01",
+  "method": "update",
+  "url": "/documented/v8/api/path/object-name",
+  "data": {
+    "description": "Managed through Fortinet MCP"
+  }
+}
+```
+
+`faz_api_batch` accepts the same fields as an array named `requests`, executes
+them in order, and stops on the first API error. It is intentionally not
+described as atomic because FortiAnalyzer does not roll back completed calls.
+
+Login and logout URLs are reserved: the client creates, renews, and closes the
+JSON-RPC session itself. API errors are raised with the FortiAnalyzer status
+code and message rather than being returned as successful MCP results.
 
 ## Security notes
 

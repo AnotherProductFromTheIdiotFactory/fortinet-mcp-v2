@@ -10,6 +10,9 @@ from config import FortiAnalyzerConfig
 class FortiAnalyzerClient:
     """FortiAnalyzer JSON-RPC API client."""
 
+    SUPPORTED_METHODS = frozenset({"get", "add", "set", "update", "delete", "exec"})
+    SESSION_ERROR_CODES = frozenset({-11})
+
     def __init__(self, cfg: FortiAnalyzerConfig):
         self._cfg = cfg
         self._client: Optional[httpx.AsyncClient] = None
@@ -25,7 +28,29 @@ class FortiAnalyzerClient:
         self._req_id += 1
         return self._req_id
 
-    async def _rpc(self, method: str, params: list[dict], require_session: bool = True) -> dict:
+    @staticmethod
+    def _result_statuses(data: dict) -> list[dict]:
+        result = data.get("result", [])
+        items = result if isinstance(result, list) else [result]
+        return [item.get("status", {}) for item in items if isinstance(item, dict)]
+
+    @classmethod
+    def _validate_request(cls, method: str, url: str) -> None:
+        if method not in cls.SUPPORTED_METHODS:
+            supported = ", ".join(sorted(cls.SUPPORTED_METHODS))
+            raise ValueError(f"Unsupported FortiAnalyzer JSON-RPC method '{method}'. Use: {supported}")
+        if not url.startswith("/") or url.startswith("//"):
+            raise ValueError("FortiAnalyzer JSON-RPC URL must be an absolute API path starting with '/'")
+        if url in {"/sys/login/user", "/sys/logout"}:
+            raise ValueError("Session endpoints are managed by the FortiAnalyzer client")
+
+    async def _rpc(
+        self,
+        method: str,
+        params: list[dict],
+        require_session: bool = True,
+        retry_session: bool = True,
+    ) -> dict:
         client = await self._get_client()
         if require_session and not self._session:
             await self.login()
@@ -34,17 +59,22 @@ class FortiAnalyzerClient:
             "method": method,
             "params": params,
             "jsonrpc": "2.0",
+            "verbose": 1,
         }
         if self._session:
             body["session"] = self._session
         resp = await client.post("/jsonrpc", json=body)
         resp.raise_for_status()
         data = resp.json()
-        result = data.get("result", [{}])
-        first = result[0] if isinstance(result, list) else result
-        status = first.get("status", {})
-        if status.get("code", 0) not in (0, 200) and require_session:
-            raise RuntimeError(f"FAZ RPC error {status.get('code')}: {status.get('message')}")
+        statuses = self._result_statuses(data)
+        failed = next((s for s in statuses if s.get("code", 0) not in (0, 200)), None)
+        if failed:
+            code = failed.get("code")
+            if require_session and retry_session and code in self.SESSION_ERROR_CODES:
+                self._session = None
+                await self.login()
+                return await self._rpc(method, params, require_session=True, retry_session=False)
+            raise RuntimeError(f"FAZ RPC error {code}: {failed.get('message', 'unknown error')}")
         return data
 
     async def login(self):
@@ -62,20 +92,49 @@ class FortiAnalyzerClient:
             await self._rpc("exec", [{"url": "/sys/logout"}])
             self._session = None
 
-    async def get(self, url: str, params: Optional[dict] = None) -> dict:
-        p = {"url": url}
+    async def request(
+        self,
+        method: str,
+        url: str,
+        data: Any = None,
+        params: Optional[dict] = None,
+    ) -> dict:
+        """Call any supported FortiAnalyzer v8 JSON-RPC API endpoint.
+
+        ``params`` contains endpoint controls such as ``filter``, ``fields``,
+        ``option``, ``loadsub``, ``range``, ``sortings``, and ``target``.
+        ``data`` is placed in the JSON-RPC parameter's ``data`` member.
+        """
+        method = method.lower().strip()
+        self._validate_request(method, url)
+        p: dict[str, Any] = {"url": url}
         if params:
+            reserved = {"url", "data"}.intersection(params)
+            if reserved:
+                names = ", ".join(sorted(reserved))
+                raise ValueError(f"Use the dedicated argument for reserved parameter(s): {names}")
             p.update(params)
-        return await self._rpc("get", [p])
+        if data is not None:
+            p["data"] = data
+        return await self._rpc(method, [p])
+
+    async def get(self, url: str, params: Optional[dict] = None) -> dict:
+        return await self.request("get", url, params=params)
 
     async def add(self, url: str, data: dict) -> dict:
-        return await self._rpc("add", [{"url": url, "data": data}])
+        return await self.request("add", url, data=data)
+
+    async def set(self, url: str, data: dict) -> dict:
+        return await self.request("set", url, data=data)
+
+    async def update(self, url: str, data: dict) -> dict:
+        return await self.request("update", url, data=data)
+
+    async def delete(self, url: str, data: Any = None) -> dict:
+        return await self.request("delete", url, data=data)
 
     async def exec(self, url: str, data: Optional[dict] = None) -> dict:
-        p: dict[str, Any] = {"url": url}
-        if data:
-            p["data"] = data
-        return await self._rpc("exec", [p])
+        return await self.request("exec", url, data=data)
 
     # ── System ─────────────────────────────────────────────────────────────
 

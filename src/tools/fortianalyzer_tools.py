@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import Any, Optional
 
 from mcp.server.fastmcp import FastMCP
 
@@ -58,6 +58,70 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
         await c.login()
         result = await c.get_adoms()
         return json.dumps(result, indent=2)
+
+    @mcp.tool()
+    async def faz_api_request(
+        device_id: str,
+        method: str,
+        url: str,
+        data: Optional[Any] = None,
+        params: Optional[dict] = None,
+    ) -> str:
+        """Call any FortiAnalyzer v8 JSON-RPC endpoint.
+
+        This is the complete-coverage tool for documented API functions that do
+        not have a dedicated ``faz_`` convenience tool. Authentication and
+        session renewal are handled automatically.
+
+        Args:
+            device_id: ID of the FortiAnalyzer instance from config.
+            method: JSON-RPC method: get, add, set, update, delete, or exec.
+            url: Documented API URL beginning with '/', for example '/sys/status'.
+            data: Optional endpoint request body placed in the RPC data member.
+            params: Optional RPC controls such as filter, fields, option, loadsub,
+                    range, sortings, target, or flags.
+        """
+        c = get_client(device_id)
+        result = await c.request(method, url, data=data, params=params)
+        return json.dumps(result, indent=2)
+
+    @mcp.tool()
+    async def faz_api_batch(device_id: str, requests: list[dict]) -> str:
+        """Run a sequence of FortiAnalyzer v8 JSON-RPC operations.
+
+        Requests execute in order and stop on the first API error. Each item
+        accepts ``method``, ``url``, and optional ``data`` and ``params`` keys.
+        Use this for related reads or carefully ordered configuration changes.
+
+        Args:
+            device_id: ID of the FortiAnalyzer instance from config.
+            requests: JSON-RPC operation objects, limited to 50 per call.
+        """
+        if not requests:
+            raise ValueError("requests must contain at least one operation")
+        if len(requests) > 50:
+            raise ValueError("faz_api_batch accepts at most 50 operations")
+
+        c = get_client(device_id)
+        results = []
+        for index, request in enumerate(requests):
+            if not isinstance(request, dict):
+                raise ValueError(f"requests[{index}] must be an object")
+            unknown = set(request) - {"method", "url", "data", "params"}
+            if unknown:
+                names = ", ".join(sorted(unknown))
+                raise ValueError(f"requests[{index}] has unsupported key(s): {names}")
+            if "method" not in request or "url" not in request:
+                raise ValueError(f"requests[{index}] requires method and url")
+            results.append(
+                await c.request(
+                    request["method"],
+                    request["url"],
+                    data=request.get("data"),
+                    params=request.get("params"),
+                )
+            )
+        return json.dumps(results, indent=2)
 
     # ── Device Registration ──────────────────────────────────────────────────
 
@@ -259,6 +323,21 @@ def register_fortianalyzer_tools(mcp: FastMCP, config: Config):
         c = get_client(device_id)
         await c.login()
         result = await c.get_report_status(task_id, adom)
+        return json.dumps(result, indent=2)
+
+    @mcp.tool()
+    async def faz_download_report(
+        device_id: str, task_id: int, adom: Optional[str] = None
+    ) -> str:
+        """Download a completed FortiAnalyzer report through JSON-RPC.
+
+        Args:
+            device_id: ID of the FortiAnalyzer instance from config.
+            task_id: Completed report task ID returned by faz_run_report.
+            adom: ADOM name (uses default from config if not specified).
+        """
+        c = get_client(device_id)
+        result = await c.download_report(task_id, adom)
         return json.dumps(result, indent=2)
 
     # ── Incidents & Events ───────────────────────────────────────────────────
